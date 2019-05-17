@@ -47,13 +47,17 @@ def classifyWords(words_dict):
     # (2) 否定词
     notList = open('notDict.txt', 'r', encoding='utf-8').readlines()
     # (3) 程度副词
-    degreeList = open('程度级别词语（中文）.txt', 'r', encoding='utf-8').readlines()
+    degreeList = open('degree.txt', 'r', encoding='utf-8').readlines()
     degreeDict = defaultdict()
-
+    for d in degreeList:
+        try:
+            degreeDict[d.split(',')[0]] = d.split(',')[1].strip()
+        except:
+            continue
     degree = 0.0
     for d in degreeList:
         if "  " in d:
-            degree = float(d.split("  ")[1].strip())
+            degree = float(d.split(",")[1].strip())
             continue
         degreeDict[d] = degree
 
@@ -69,9 +73,9 @@ def classifyWords(words_dict):
         elif word in degreeDict.keys():
             degreeWord[words_dict[word]] = degreeDict[word]
 
-    # print(senWord)
-    # print(notWord)
-    # print(degreeWord)
+    #print(senWord)
+    #print(notWord)
+    #print(degreeWord)
     return senWord, notWord, degreeWord
 
 
@@ -79,6 +83,7 @@ def scoreSent(senWord, notWord, degreeWord, segResult):
     """
     3. 情感聚合
     """
+    print(degreeWord)
     W = 1
     score = 0
     # 存所有情感词的位置的列表
@@ -117,6 +122,61 @@ def scoreSent(senWord, notWord, degreeWord, segResult):
     return score
 
 
+def edegreeSent(senWord, notWord, degreeWord, segResult):
+    """
+    3. 情感倾向分析
+    """
+    W = 1
+    score = 0
+    edegree = 0 #情感倾向值
+    D = 0 #标记是否具有程度副词
+    # 存所有情感词的位置的列表
+    senLoc = list(senWord.keys())
+    notLoc = list(notWord.keys())
+    degreeLoc = list(degreeWord.keys())
+
+    # print(type(list(notLoc)))
+    senloc = -1
+    # notloc = -1
+    # degreeloc = -1
+
+    # 遍历句中所有单词segResult，i为单词绝对位置
+    for i in range(0, len(segResult)):
+        # 如果该词为情感词
+        if i in senLoc:
+            # loc为情感词位置列表的序号
+            senloc += 1
+            # 直接添加该情感词分数
+            score += W * float(senWord[i])
+            # print("score = %f" % score)
+            if senloc < len(senLoc) - 1:
+                # 判断该情感词与下一情感词之间是否有否定词或程度副词
+                # j为绝对位置
+                for j in range(senLoc[senloc], senLoc[senloc + 1]):
+                    # 如果有否定词
+                    if j in notLoc:
+                        W *= -1
+                    # 如果有程度副词
+                    elif j in degreeLoc:
+                        W *= float(degreeWord[j])
+                        D = 1
+        # i定位至下一个情感词
+        if senloc < len(senLoc) - 1:
+            i = senLoc[senloc + 1]
+    # print(score)
+    if score > 0 and D ==1:
+        edegree =2
+    if score == 0:
+        edegree = 0
+    if score < 0:
+        edegree = -1
+    if score > 0 and D == 0:
+        edegree = 1
+    if score < 0 and D == 1:
+        edegree = -2
+    return edegree
+
+
 def give_score(sentence):
     words = sent2word(sentence)
 
@@ -129,15 +189,28 @@ def give_score(sentence):
 
     return scoreSent(senWord, notWord, degreeWord, words)
 
+def give_edegree(sentence):
+    words = sent2word(sentence)
+
+    words_dict = {}
+
+    for i, w in enumerate(words):
+        words_dict[w] = i
+
+    senWord, notWord, degreeWord = classifyWords(words_dict)
+
+    return edegreeSent(senWord, notWord, degreeWord, words)
 
 def comment_sent_analy():
-    sentences = open("小米9微博.txt", 'r',encoding='utf-8').readlines()
-    res = open("mi9WeiBo.txt", "w", encoding='utf-8')
+    sentences = open("微博搜索iqoo.csv", 'r',encoding='utf-8').readlines()
+    res = open("iqooWeiBo.csv", "w", encoding='utf-8')
     for sentence in sentences:
         score = give_score(sentence.strip())/sqrt(sentence.__len__())
+        edegree = give_edegree(sentence.strip())
         print(sentence.strip())
         print(score)
-        res.write(str(sentence.strip())+"\t"+str(score) + "\n")
+        print(edegree)
+        res.write(str(sentence.strip())+','+"\t"+str(score)+"\t"+','+str(edegree) + "\n")
 
 
 if __name__ == '__main__':
